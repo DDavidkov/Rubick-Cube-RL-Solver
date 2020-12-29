@@ -3,10 +3,12 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 
-from cube_model_naive import Cube
+
+from cube_model import Cube, plot_state
 from gather_data import gen_training_set, batch_generator
 from cnn import cnn_init as init_fun
 from cnn import cnn_apply as apply_fun
+
 
 from jax.experimental import optimizers
 opt_init, opt_update, get_params = optimizers.adam(step_size=0.0001)
@@ -15,21 +17,16 @@ opt_init, opt_update, get_params = optimizers.adam(step_size=0.0001)
 def loss(params, batch, apply_fun):
     X, (y_vals, y_acts), w = batch
     vhead_out, phead_out = apply_fun(params, X)
-
     num_train = X.shape[0]
-
     mse_loss = np.sum(((vhead_out - y_vals) ** 2).squeeze() * w) / np.sum(w)
     cross_entropy_loss = - np.sum(phead_out[np.arange(num_train), y_acts.squeeze()] * w) / np.sum(w)
     return mse_loss + cross_entropy_loss
-
 
 @jax.jit
 def update(i, opt_state, batch):
     params = get_params(opt_state)
     L, grads = jax.value_and_grad(loss)(params, batch, apply_fun)
     return L, opt_update(i, grads, opt_state)
-
-
 
 def train(input_shape, batch_size, num_epochs, seed=None):
     """
@@ -42,9 +39,8 @@ def train(input_shape, batch_size, num_epochs, seed=None):
     _, params = init_fun(init_rng, input_shape)
     opt_state = opt_init(params)
 
-
     l = 100         # number of episodes
-    k_max = 10      # sequence length
+    k_max = 20      # sequence length
     loss_history = []
 
     # Begin training.
@@ -60,7 +56,10 @@ def train(input_shape, batch_size, num_epochs, seed=None):
         for i, batch in enumerate(train_batches):
             loss, opt_state = update(i, opt_state, batch)
             mean_loss = (i * mean_loss + loss) / (i + 1)
-        
+
+        # Update model params.
+        params = get_params(opt_state)
+
         # Book-keeping.
         loss_history.append(mean_loss)
 
@@ -70,16 +69,26 @@ def train(input_shape, batch_size, num_epochs, seed=None):
         # Printout results.
         print("(Epoch ({}, {}) took {:.3f} seconds), mean_loss = {:.3f}".format(
                                                     epoch + 1, num_epochs, (toc - tic), mean_loss))
-    params = get_params(opt_state)
     return params, loss_history
 
 
 if __name__ == "__main__":
     input_shape = (3, 18, 6)
-    batch_size = 16
-    num_epochs = 3
+    batch_size = 128
+    num_epochs = 5
     seed = 42
 
     params, loss_history = train(input_shape, batch_size, num_epochs, seed)
 
+    cube = Cube()
+    cube.set_random_state()
+
+    for _ in range(10):
+        val, policy = apply_fun(params, np.array([cube._state]))
+        act = int(np.argmax(policy, axis=1))
+        cube.step(act)
+
+        print("taking action: ", act)
+        plot_state(cube._state)
+        print("\n========== #### ===========\n")
 #
