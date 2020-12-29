@@ -2,7 +2,7 @@ import jax
 import numpy as np
 
 
-from cube_model import Cube, plot_state, expand_states
+from cube_model_naive import Cube, plot_state, expand_states
 
 
 def gen_training_set(rng, l, k_max, params, apply_fun):
@@ -19,6 +19,7 @@ def gen_training_set(rng, l, k_max, params, apply_fun):
     # Create `l` number of episodes.
     for i in range(l):
         rng, k_rng, act_rng = jax.random.split(rng, num=3)
+        # k = int(jax.random.randint(k_rng, shape=(1,), minval=0, maxval=k_max))
         k = k_max
 
         # Generate a random sequence of states starting from the solved state.
@@ -63,3 +64,5 @@ def batch_generator(rng, data, batch_size):
         yield (data["X"][idxs],
                (data["y"][0][idxs], data["y"][1][idxs]),
                data["w"][idxs])
+
+#
