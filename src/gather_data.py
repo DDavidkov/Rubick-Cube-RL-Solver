@@ -5,7 +5,7 @@ import numpy as np
 from cube_model_naive import Cube, plot_state, expand_states
 
 
-def gen_training_set(rng, l, k_max, params, apply_fun):
+def gen_training_set(rng, episodes, k_max, params, apply_fun):
     """
     @params l (int): Number of episodes.
     @params k_max (int): Maximum number of shuffle steps in each episode.
@@ -17,7 +17,7 @@ def gen_training_set(rng, l, k_max, params, apply_fun):
     cube = Cube()
 
     # Create `l` number of episodes.
-    for i in range(l):
+    for i in range(episodes):
         rng, k_rng, act_rng = jax.random.split(rng, num=3)
         # k = int(jax.random.randint(k_rng, shape=(1,), minval=0, maxval=k_max))
         k = k_max
@@ -32,6 +32,10 @@ def gen_training_set(rng, l, k_max, params, apply_fun):
 
         # Evaluate children states.
         vals, policies = jax.jit(apply_fun)(params, children)
+
+        # Assign value of 0 to all terminal states.
+        idxs = [cube.is_terminal(c) for c in children]
+        vals = jax.ops.index_update(vals, jax.ops.index[idxs, :], 0)
 
         # Make targets.
         vals = vals.reshape(k, num_actions) + rewards
