@@ -88,6 +88,10 @@ class Cube:
     def is_solved(self):
         """ Return True if the current state is the terminal state for the cube. """
         return np.all(self._state == self._terminal_state)
+    
+    def is_terminal(self, state):
+        """ Return True if the state is the terminal state for the cube. """
+        return np.all(state == self._terminal_state)
 
     #----------- private methods ----------#
     def _left_anticlock(self):
@@ -308,7 +312,7 @@ class Cube:
         next_state[:, 3*side:3*(side+1)] = np.rot90(self._state[:, 3*side:3*(side+1)], k=(-1)**dir)
 
         # Rotate the adjecent rows.
-        next_state[-1, 0:12] = np.roll(self._state[-1, 0:12], shift=3, axis=0)
+        next_state[-1, 0:12] = np.roll(self._state[-1, 0:12], shift=-3, axis=0)
 
         return next_state
 
@@ -326,7 +330,7 @@ class Cube:
         next_state[:, 3*side:3*(side+1)] = np.rot90(self._state[:, 3*side:3*(side+1)], k=(-1)**dir)
 
         # Rotate the adjecent rows.
-        next_state[-1, 0:12] = np.roll(self._state[-1, 0:12], shift=-3, axis=0)
+        next_state[-1, 0:12] = np.roll(self._state[-1, 0:12], shift=3, axis=0)
 
         return next_state
 
