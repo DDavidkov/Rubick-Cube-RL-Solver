@@ -23,18 +23,18 @@ class RubickEnv:
         self.reset()
 
         self.actions = {
-            RubickMove.U: lambda: self.make_u(1),
-            RubickMove.U_PRIM: lambda: self.make_u(-1),
-            RubickMove.D: lambda: self.make_d(1),
-            RubickMove.D_PRIM: lambda: self.make_d(-1),
-            RubickMove.F: lambda: self.make_f(1),
-            RubickMove.F_PRIM: lambda: self.make_f(-1),
-            RubickMove.B: lambda: self.make_b(1),
-            RubickMove.B_PRIM: lambda: self.make_b(-1),
-            RubickMove.L: lambda: self.make_l(1),
-            RubickMove.L_PRIM: lambda: self.make_l(-1),
-            RubickMove.R: lambda: self.make_r(1),
-            RubickMove.R_PRIM: lambda: self.make_r(-1),
+            RubickMove.U: lambda state: self.make_u(state, 1),
+            RubickMove.U_PRIM: lambda state: self.make_u(state, -1),
+            RubickMove.D: lambda state: self.make_d(state, 1),
+            RubickMove.D_PRIM: lambda state: self.make_d(state, -1),
+            RubickMove.F: lambda state: self.make_f(state, 1),
+            RubickMove.F_PRIM: lambda state: self.make_f(state, -1),
+            RubickMove.B: lambda state: self.make_b(state, 1),
+            RubickMove.B_PRIM: lambda state: self.make_b(state, -1),
+            RubickMove.L: lambda state: self.make_l(state, 1),
+            RubickMove.L_PRIM: lambda state: self.make_l(state, -1),
+            RubickMove.R: lambda state: self.make_r(state, 1),
+            RubickMove.R_PRIM: lambda state: self.make_r(state, -1),
             RubickMove.SCRAMBLE: lambda: self.scramble(100),
             RubickMove.RESET: lambda: self.reset(),
             RubickMove.UNDO: lambda: self.undo(),
@@ -82,27 +82,34 @@ class RubickEnv:
             ]
         ])
 
+    def get_nn_state(self):
+        return RubickEnv.transform_state(self.state)
+
     def scramble(self, number_of_moves=15):
         self.undo_stack.clear()
         self.redo_stack.clear()
 
         for _ in range(number_of_moves):
             move = RubickMove(np.random.randint(0, 11))
-            self.actions[move]()
+            self.actions[move](self.state)
 
-    def step(self, action: RubickMove):
-        self.actions[action]()
+    def step(self, action: RubickMove, expand=False):
+        args = [self.state] if action.value < 12 else []
+        self.actions[action](*args)
 
         if action.value < 12:
-            done = ((self.state["triples"] == self.solved_state["triples"]).all() and
-                    (self.state["doubles"] == self.solved_state["doubles"]).all())
+            done = RubickEnv.is_solved(self.state, self.solved_state)
+            reward = 1 if done else -1
 
             self.undo_stack.append(RubickEnv.get_opposite_action(action))
             self.redo_stack.clear()
 
-            return self.state, 0 if done else -1, done
+            if expand:
+                return self.get_nn_state(), reward, self.expand()
+            else:
+                return self.get_nn_state(), reward
         else:
-            return self.state, None, None
+            return self.state, None
 
     def set_seed(self, seed=0):
         self.seed = seed
@@ -125,50 +132,71 @@ class RubickEnv:
     def undo(self):
         if self.can_undo():
             action = self.undo_stack.pop()
-            self.actions[action]()
+            self.actions[action](self.state)
             self.redo_stack.append(RubickEnv.get_opposite_action(action))
 
     def redo(self):
         if self.can_redo():
             action = self.redo_stack.pop()
-            self.actions[action]()
+            self.actions[action](self.state)
             self.undo_stack.append(RubickEnv.get_opposite_action(action))
 
-    def make_u(self, roll_amount):
-        self.state["triples"][0] = np.roll(self.state["triples"][0], roll_amount, axis=0)
-        self.state["doubles"][0] = np.roll(self.state["doubles"][0], roll_amount, axis=0)
+    def expand(self):
+        expanded_states = []
+        rewards = []
+        for i in range(12):
+            state_copy = {
+                "triples": self.state["triples"].copy(),
+                "doubles": self.state["doubles"].copy()
+            }
+            self.actions[RubickMove(i)](state_copy)
+            reward = 1 if RubickEnv.is_solved(state_copy, self.solved_state) else -1
+            rewards.append(reward)
+            expanded_states.append(RubickEnv.transform_state(state_copy))
 
-    def make_d(self, roll_amount):
-        self.state["triples"][1] = np.roll(self.state["triples"][1], roll_amount, axis=0)
-        self.state["doubles"][2] = np.roll(self.state["doubles"][2], roll_amount, axis=0)
+        return np.array(expanded_states), np.array(rewards)
 
-    def make_f(self, roll_amount):
+    @staticmethod
+    def make_u(state, roll_amount):
+        state["triples"][0] = np.roll(state["triples"][0], roll_amount, axis=0)
+        state["doubles"][0] = np.roll(state["doubles"][0], roll_amount, axis=0)
+
+    @staticmethod
+    def make_d(state, roll_amount):
+        state["triples"][1] = np.roll(state["triples"][1], roll_amount, axis=0)
+        state["doubles"][2] = np.roll(state["doubles"][2], roll_amount, axis=0)
+
+    @staticmethod
+    def make_f(state, roll_amount):
         triples_to_rotate = [(0, 0), (0, 1), (1, 1), (1, 0)]
-        RubickEnv.rotate_triple(triples_to_rotate, roll_amount, self.state["triples"])
+        RubickEnv.rotate_triple(triples_to_rotate, roll_amount, state["triples"])
 
         doubles_to_rotate = [(0, 0), (1, 1), (2, 0), (1, 0)]
-        RubickEnv.rotate_double(doubles_to_rotate, roll_amount, self.state["doubles"])
+        RubickEnv.rotate_double(doubles_to_rotate, roll_amount, state["doubles"])
 
-    def make_b(self, roll_amount):
+    @staticmethod
+    def make_b(state, roll_amount):
         triples_to_rotate = [(0, 2), (0, 3), (1, 3), (1, 2)]
-        RubickEnv.rotate_triple(triples_to_rotate, roll_amount, self.state["triples"])
+        RubickEnv.rotate_triple(triples_to_rotate, roll_amount, state["triples"])
 
         doubles_to_rotate = [(0, 2), (1, 3), (2, 2), (1, 2)]
-        RubickEnv.rotate_double(doubles_to_rotate, roll_amount, self.state["doubles"])
+        RubickEnv.rotate_double(doubles_to_rotate, roll_amount, state["doubles"])
 
-    def make_l(self, roll_amount):
+    @staticmethod
+    def make_l(state, roll_amount):
         triples_to_rotate = [(0, 3), (0, 0), (1, 0), (1, 3)]
-        RubickEnv.rotate_triple(triples_to_rotate, roll_amount, self.state["triples"])
+        RubickEnv.rotate_triple(triples_to_rotate, roll_amount, state["triples"])
 
         doubles_to_rotate = [(0, 3), (1, 0), (2, 3), (1, 3)]
-        RubickEnv.rotate_double(doubles_to_rotate, roll_amount, self.state["doubles"])
+        RubickEnv.rotate_double(doubles_to_rotate, roll_amount, state["doubles"])
 
-    def make_r(self, roll_amount):
+    @staticmethod
+    def make_r(state, roll_amount):
         triples_to_rotate = [(0, 1), (0, 2), (1, 2), (1, 1)]
-        RubickEnv.rotate_triple(triples_to_rotate, roll_amount, self.state["triples"])
+        RubickEnv.rotate_triple(triples_to_rotate, roll_amount, state["triples"])
 
         doubles_to_rotate = [(0, 1), (1, 2), (2, 1), (1, 1)]
-        RubickEnv.rotate_double(doubles_to_rotate, roll_amount, self.state["doubles"])
+        RubickEnv.rotate_double(doubles_to_rotate, roll_amount, state["doubles"])
 
     @staticmethod
     def rotate_double(indexes, roll_amount, original):
@@ -195,3 +223,15 @@ class RubickEnv:
             return None
         else:
             return RubickMove(action.value + 1) if action.value % 2 == 0 else RubickMove(action.value - 1)
+
+    @staticmethod
+    def transform_state(state):
+        triples = state["triples"].reshape(-1, 6)
+        doubles = state["doubles"].reshape(-1, 6)
+
+        return np.concatenate((triples, doubles))
+
+    @staticmethod
+    def is_solved(state, solved_state):
+        return ((state["triples"] == solved_state["triples"]).all() and
+                (state["doubles"] == solved_state["doubles"]).all())

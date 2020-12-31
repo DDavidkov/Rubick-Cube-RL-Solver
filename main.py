@@ -19,5 +19,6 @@ bottom_labels = [
     "Ctrl + Y - Redo"
 ]
 
-window = RubickCubeWindow(RubickEnv(), bottom_labels, top_labels)
+env = RubickEnv()
+window = RubickCubeWindow(env, bottom_labels, top_labels)
 pyglet.app.run()
