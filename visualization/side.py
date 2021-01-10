@@ -9,14 +9,6 @@ class RubickSide():
         self._batch = batch
         self._elements = []
 
-    @property
-    def side(self):
-        return self._side
-
-    @side.setter
-    def side(self, value):
-        self._side = value
-
     def update(self, state):
         self._elements.clear()
         self._elements.extend(self(state))
