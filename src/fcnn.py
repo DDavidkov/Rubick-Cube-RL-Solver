@@ -5,11 +5,11 @@ import jax
 from jax.experimental.stax import Conv, Relu, MaxPool, Flatten, Dense, serial
 from jax.nn import log_softmax
 
-def conv_net():
+def fc_net():
     vhead_out_dim, phead_out_dim = 1, 12
-    serial_init, serial_apply = serial(Conv(6, (3,3), (1,1), padding="SAME"), Relu,
-                                       Conv(32, (3,3), (1,1), padding="SAME"), Relu,
-                                       Flatten)
+    serial_init, serial_apply = serial(Flatten,
+                                       Dense(4096), Relu,
+                                       Dense(2048), Relu)
     vhead_init, vhead_apply = serial(Dense(512), Relu, Dense(vhead_out_dim))
     phead_init, phead_apply = serial(Dense(512), Relu, Dense(phead_out_dim))
 
@@ -30,8 +30,5 @@ def conv_net():
         out = (vhead_out, phead_out)
         return out
     return init_fun, apply_fun
-
-
-cnn_init, cnn_apply = conv_net()
 
 #
