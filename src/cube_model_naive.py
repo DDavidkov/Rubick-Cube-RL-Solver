@@ -72,10 +72,6 @@ class Cube:
     #----------- env initializer ----------#
     def __init__(self):
         """ Initialize an environment object. """
-        # # Create the action space.
-        # self._num_actions = len(self.Side) * len(self.Direction)
-        # self._action_space = np.arange(self._num_actions, dtype=int)
-
         # Enumerate all valid actions from the action space.
         self._take_action = {0: self._left_anticlock,
                              1: self._left_clock,
@@ -89,12 +85,6 @@ class Cube:
                              9: self._up_clock,
                              10: self._down_anticlock,
                              11: self._down_clock}
-
-        # # Create the terminal state and represent the colors of the stickers as one-hot vectors.
-        # self._terminal_state = np.hstack([np.full((3,3), _col) for _col in self.Color])
-        # self._terminal_state = np.array(np.expand_dims(
-        #                                     self._terminal_state, -1) == np.arange(len(self.Color)),
-        #                                     dtype=np.float32)
 
         # Set the current state to None.
         self._state = None
@@ -152,19 +142,9 @@ class Cube:
         """ Set the current state of the environment to the terminal state. """
         self._state = self.terminal_state.copy()
 
-    # def is_valid(self):
-    #     """ Return True if the current state is a valid state for the environment. """
-    #     print("Not implemented!")
-    #     return True
-
     def is_solved(self):
         """ Return True if the current state is the terminal state for the environment. """
         return self.is_terminal(self._state)
-        # return np.all(self._state == self._terminal_state)
-
-    # def is_terminal(self, state):
-    #     """ Return True if the state is the terminal state for the cube. """
-    #     return np.all(state == self._terminal_state)
 
     #----------- private methods ----------#
     def _left_anticlock(self):
@@ -174,6 +154,7 @@ class Cube:
         # Unpack cube sides and rotation directions.
         l, f, r, b, u, d = self.Side
         a_cl, cl = self.Direction
+        _ = (l, f, r, b, u, d, a_cl, cl)
         next_state = self._state.copy()
 
         # Rotate the side in the given direction
@@ -195,6 +176,7 @@ class Cube:
         # Unpack cube sides and rotation directions.
         l, f, r, b, u, d = self.Side
         a_cl, cl = self.Direction
+        _ = (l, f, r, b, u, d, a_cl, cl)
         next_state = self._state.copy()
 
         # Rotate the side in the given direction
@@ -216,6 +198,7 @@ class Cube:
         # Unpack cube sides and rotation directions.
         l, f, r, b, u, d = self.Side
         a_cl, cl = self.Direction
+        _ = (l, f, r, b, u, d, a_cl, cl)
         next_state = self._state.copy()
 
         # Rotate the side in the given direction
@@ -237,6 +220,7 @@ class Cube:
         # Unpack cube sides and rotation directions.
         l, f, r, b, u, d = self.Side
         a_cl, cl = self.Direction
+        _ = (l, f, r, b, u, d, a_cl, cl)
         next_state = self._state.copy()
 
         # Rotate the side in the given direction
@@ -258,6 +242,7 @@ class Cube:
         # Unpack cube sides and rotation directions.
         l, f, r, b, u, d = self.Side
         a_cl, cl = self.Direction
+        _ = (l, f, r, b, u, d, a_cl, cl)
         next_state = self._state.copy()
 
         # Rotate the side in the given direction
@@ -279,6 +264,7 @@ class Cube:
         # Unpack cube sides and rotation directions.
         l, f, r, b, u, d = self.Side
         a_cl, cl = self.Direction
+        _ = (l, f, r, b, u, d, a_cl, cl)
         next_state = self._state.copy()
 
         # Rotate the side in the given direction
@@ -300,6 +286,7 @@ class Cube:
         # Unpack cube sides and rotation directions.
         l, f, r, b, u, d = self.Side
         a_cl, cl = self.Direction
+        _ = (l, f, r, b, u, d, a_cl, cl)
         next_state = self._state.copy()
 
         # Rotate the side in the given direction
@@ -321,6 +308,7 @@ class Cube:
         # Unpack cube sides and rotation directions.
         l, f, r, b, u, d = self.Side
         a_cl, cl = self.Direction
+        _ = (l, f, r, b, u, d, a_cl, cl)
         next_state = self._state.copy()
 
         # Rotate the side in the given direction
@@ -342,6 +330,7 @@ class Cube:
         # Unpack cube sides and rotation directions.
         l, f, r, b, u, d = self.Side
         a_cl, cl = self.Direction
+        _ = (l, f, r, b, u, d, a_cl, cl)
         next_state = self._state.copy()
 
         # Rotate the side in the given direction
@@ -360,6 +349,7 @@ class Cube:
         # Unpack cube sides and rotation directions.
         l, f, r, b, u, d = self.Side
         a_cl, cl = self.Direction
+        _ = (l, f, r, b, u, d, a_cl, cl)
         next_state = self._state.copy()
 
         # Rotate the side in the given direction
@@ -378,6 +368,7 @@ class Cube:
         # Unpack cube sides and rotation directions.
         l, f, r, b, u, d = self.Side
         a_cl, cl = self.Direction
+        _ = (l, f, r, b, u, d, a_cl, cl)
         next_state = self._state.copy()
 
         # Rotate the side in the given direction
@@ -396,6 +387,7 @@ class Cube:
         # Unpack cube sides and rotation directions.
         l, f, r, b, u, d = self.Side
         a_cl, cl = self.Direction
+        _ = (l, f, r, b, u, d, a_cl, cl)
         next_state = self._state.copy()
 
         # Rotate the side in the given direction
@@ -429,38 +421,5 @@ class Cube:
         result[0:3, 3:6] = state[:, 12:15]
         result[6:9, 3:6] = state[:, 15:]
         print(result)
-
-
-##############################
-def plot_state(state):
-    result = np.zeros((9, 12), dtype=int)
-    state = np.argmax(state, axis=-1)
-    result[3:6, :] = state[:, :12]
-    result[0:3, 3:6] = state[:, 12:15]
-    result[6:9, 3:6] = state[:, 15:]
-    print(result)
-
-def expand_states(states):
-    zipped = [expand_state(s) for s in states]
-    children, rewards = list(zip(*zipped))
-    children = np.stack(children)
-    rewards = np.stack(rewards)
-    _k, _a, *view = children.shape
-    children = children.reshape(_k * _a, *view)
-    return children, rewards
-
-def expand_state(state):
-    cube = Cube()
-    children = []
-    rewards = []
-    for act in cube.action_space:
-        cube._state = state
-        child, reward, _ = cube.step(act)
-        children.append(child)
-        rewards.append(reward)
-    return np.stack(children), np.stack(rewards)
-
-# def one_hot(state):
-#     return np.array(np.expand_dims(state, -1) == np.arange(6), dtype=float)
 
 #
