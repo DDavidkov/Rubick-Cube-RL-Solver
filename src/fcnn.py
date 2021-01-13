@@ -1,3 +1,4 @@
+"""Fully connected neural networks"""
 import numpy as np
 import jax.numpy as jnp
 import jax
@@ -31,4 +32,45 @@ def fc_net():
         return out
     return init_fun, apply_fun
 
-#
+
+def value_policy_approximator():
+    """ Return (value, policy) tuple for an input state. """
+    serial_init, serial_apply = serial(Flatten,
+                                       Dense(2048), Relu,
+                                       Dense(1024), Relu)
+    vhead_init, vhead_apply = serial(Dense(512), Relu, Dense(1))
+    phead_init, phead_apply = serial(Dense(512), Relu, Dense(12))
+
+    def init_fun(rng, input_shape):
+        rng, vhead_rng, phead_rng = jax.random.split(rng, 3)
+        serial_out_shape, serial_params = serial_init(rng, input_shape)
+        vhead_out_shape, vhead_params = vhead_init(vhead_rng, serial_out_shape)
+        phead_out_shape, phead_params = phead_init(phead_rng, serial_out_shape)
+        out_shape = (vhead_out_shape, phead_out_shape)
+        params = [serial_params, vhead_params, phead_params]
+        return out_shape, params
+
+    def apply_fun(params, inputs):
+        serial_params, vhead_params, phead_params = params
+        serial_out = serial_apply(serial_params, inputs)
+        vhead_out = vhead_apply(vhead_params, serial_out)
+        phead_out = log_softmax(phead_apply(phead_params, serial_out))
+        return (vhead_out, phead_out)
+
+    return init_fun, apply_fun
+
+
+def value_appoximator():
+    """ Returns the value of the input state. """
+    init, apply = serial(Flatten,
+                         Dense(1024),
+                         Relu,
+                         Dense(512),
+                         Relu,
+                         Dense(256),
+                         Relu,
+                         Dense(1))
+    return init, apply
+
+
+init_fun, apply_fun = fc_net()
