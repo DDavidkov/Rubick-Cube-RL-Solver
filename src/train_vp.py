@@ -140,9 +140,9 @@ def loss_fun(params, batch):
     X, v, pi, w = batch
     v_pred, pi_pred = apply_fun(params, X)
     v_pred = v_pred.ravel()
-    V_loss = jnp.sum(hubber(v - v_pred) * w)
+    V_loss = jnp.mean(hubber(v - v_pred) * w)
     N = X.shape[0]
-    pi_loss = -jnp.sum(pi_pred[jnp.arange(N), pi.squeeze()] * w)
+    pi_loss = -jnp.mean(pi_pred[jnp.arange(N), pi.squeeze()] * w)
     return V_loss + pi_loss + l2_regularizer(params)
 
 loss_frads_fun = jax.value_and_grad(loss_fun)

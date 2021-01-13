@@ -138,8 +138,7 @@ def hubber(x):
 def hubber_loss(params, batch):
     X, y, w = batch
     vals = apply_fun(params, X).ravel()
-    L = hubber(vals - y)
-    return jnp.sum(L * w) + l2_regularizer(params, 1e-4)
+    return jnp.mean(hubber(vals - y) * w) + l2_regularizer(params, 1e-4)
 
 
 @jax.jit
