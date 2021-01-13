@@ -2,6 +2,7 @@ import time
 import numpy as np
 import jax
 import jax.numpy as jnp
+import os
 from jax.experimental import optimizers
 from jax.tree_util import tree_flatten, tree_unflatten, tree_map
 from functools import partial
