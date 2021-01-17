@@ -61,13 +61,19 @@ def value_policy_approximator():
 
 
 def value_appoximator():
-    """ Returns the value of the input state. """
+    """
+    Approximator for value of the input state.
+
+    Returns
+    -------
+    (init, apply) tuple
+    """
     init, apply = serial(Flatten,
-                         Dense(1024),
+                         Dense(2048), # 1024
                          Relu,
-                         Dense(512),
+                         Dense(1024), # 512
                          Relu,
-                         Dense(256),
+                         Dense(512),  # 256
                          Relu,
                          Dense(1))
     return init, apply
