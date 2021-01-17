@@ -55,16 +55,20 @@ def generate_episodes(rng, env, episodes, k, decay=1.0):
     # Create `episodes` number of episodes.
     for _ in range(episodes):
         cube.reset()
-        rng, sub_rng = jax.random.split(rng)
-        # TODO Why use JAX ??
-        actions = jax.random.randint(sub_rng, shape=(k,), minval=0, maxval=12)
+        actions = np.random.randint(0, 12, k)
         states.extend((cube.step(act)[0] for act in actions))
-        w.extend(1 / (d ** decay) for d in range(1, k + 1))
-        # w.extend(1 / d for d in range(1, k + 1))
+        denom = 1 / (np.arange(1, k + 1) ** decay)
+        w.extend(denom)
 
     # Expand each state to obtain children and rewards.
     children, rewards = expand_states(states, env)
-
+    # # Discount rewards
+    # gamma = np.ones(k, dtype=np.float32)
+    # gamma[1:] = 0.99
+    # gamma = np.multiply.accumulate(gamma)
+    # gamma = np.tile(gamma, episodes)
+    # rewards = np.array(rewards, dtype=np.float32)
+    # rewards *= gamma.reshape(-1, 1)
     return jnp.array(states), jnp.array(w), jnp.array(children), jnp.array(rewards)
 
 
@@ -97,13 +101,26 @@ def batch_generator(rng, data, batch_size):
     @param batch_size (int):
     @yields batch (Dict): Random batch of data of size `batch_size`.
     """
-    num_train = data["X"].shape[0]
+    choices = jnp.arange(data["X"].shape[0])
     while True:
         rng, sub_rng = jax.random.split(rng)
-        idxs = jax.random.choice(sub_rng, jnp.arange(num_train), shape=(batch_size,), replace=False)
+        idxs = jax.random.choice(sub_rng, choices, shape=(batch_size,), replace=False)
         yield (data["X"][idxs],
                data["y"][idxs],
                data["w"][idxs])
+
+
+def beam_search(env, state, params, apply, max_depth=30):
+    d = 0
+    current = state.copy()
+    while d < max_depth:
+        d += 1
+        children, _ = expand_states([current], env)
+        Vs = apply(params, children).ravel()
+        current = children[np.argmax(Vs)]
+        if np.all(current == env.terminal_state):
+            return True
+    return False
 
 
 #-------------------- optimizer and LR schedule --------------------#
@@ -186,15 +203,35 @@ def train(rng, env, batch_size=128, num_epochs=5, num_iterations=21,
     else:
         params = list(jnp.load(params_filepath, allow_pickle=True))
 
+    _solved_state = np.expand_dims(env.terminal_state, axis=0)
+    _solved_state = jnp.array(_solved_state)
+    # Set Numpy seed
+    np.random.seed(17)
+
+    # Generate test states
+    test_set = []
+    x = env()
+    for _ in range(100):
+        x.reset()
+        x.shuffle(np.random.randint(5, 15))
+        test_set.append(x.state.copy())
+    del x
+    # Generate test episodes
+    test_episodes = generate_episodes(rng, env, 100, 20)[0]
+    test_episodes_shape = (100, 20)
+
 
     loss_history = []
     progress = []
     p_iteration_fmt = 'Iteration, {}, {}, {:.1f}, {:.3f}\n'
     p_epoch_fmt = 'Epoch {}, {}, {:.1f}, {:.3f}\n\n'
+
+
     # Begin training.
-    decays = np.linspace(1.0, 0.2, 64)
+    decays = np.hstack([np.ones(20, dtype=np.float32),
+                        np.linspace(1.0, 0.1, 64)])
     for e in range(num_epochs):
-        decay = decays[e] if e < len(decays) else 0.2
+        decay = decays[e] if e < len(decays) else 0.1
         tic = time.time()
         opt_state = opt_init(params)
 
@@ -224,6 +261,7 @@ def train(rng, env, batch_size=128, num_epochs=5, num_iterations=21,
                 total_loss += loss
 
             # Book-keeping.
+
             iter_mean_loss = total_loss / num_samples
             epoch_mean_loss = (it * epoch_mean_loss + iter_mean_loss) / (it + 1)
             loss_history.append(iter_mean_loss)
@@ -246,6 +284,18 @@ def train(rng, env, batch_size=128, num_epochs=5, num_iterations=21,
                     toc - tic,
                     epoch_mean_loss
                 ))
+        # Do Value evaluation of TEST EPISIDES
+        Vs = apply_fun(params, test_episodes).reshape(test_episodes_shape)
+        Vmeans = np.mean(Vs, axis=0)
+        Vsolved = float(apply_fun(params, _solved_state))
+        print('Solved state V: {:.3f}'.format(Vsolved))
+        for q, m in enumerate(Vmeans, 1):
+            print('Distance {} states mean V: {:.3f}'.format(q, m))
+        # Do Best First Search evaluation of TEST SET
+        bs_solved = [beam_search(env, s, params, apply_fun) for s in test_set]
+        bs_rate = sum(bs_solved) / len(bs_solved)
+        print('GBFS solution rate: {:.2f}'.format(bs_rate))
+
         # Epoch verbose
         if verbose:
             print(progress[-1], end='')
@@ -270,15 +320,17 @@ if __name__ == "__main__":
     ### Run training.
     params, loss_history = train(rng, env,
                                  batch_size=512,
-                                 num_epochs=20,
+                                 num_epochs=10,
                                  num_iterations=4,
-                                 num_samples=4,
+                                 num_samples=48,
                                  print_every=1,
                                  episodes=1000,
                                  k_max=24,
                                  verbose=True,
                                  params_filepath=None)
 
+    epi = generate_episodes(rng, env, 1, 30)[0]
+    apply_fun(params, epi)
 
 # from rubick import RubickCube as env
 # rng = jax.random.PRNGKey(seed=17)
