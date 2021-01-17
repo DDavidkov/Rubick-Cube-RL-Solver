@@ -32,7 +32,7 @@ def expand_states(states, env):
     return children, rewards
 
 
-def generate_episodes(rng, env, episodes, k, decay=1.0):
+def generate_episodes(env, episodes, k, decay=1.0):
     """ Generate a random sequence of states starting from the solved state.
 
     @param env (Cube Object): A Cube object representing the environment.
@@ -110,7 +110,7 @@ def batch_generator(rng, data, batch_size):
                data["w"][idxs])
 
 
-def beam_search(env, state, params, apply, max_depth=30):
+def beam_search(env, state, params, apply, max_depth=20):
     d = 0
     current = state.copy()
     while d < max_depth:
@@ -211,35 +211,30 @@ def train(rng, env, batch_size=128, num_epochs=5, num_iterations=21,
     # Generate test states
     test_set = []
     x = env()
-    for _ in range(100):
+    for _ in range(1000):
         x.reset()
         x.shuffle(np.random.randint(5, 15))
         test_set.append(x.state.copy())
     del x
     # Generate test episodes
-    test_episodes = generate_episodes(rng, env, 100, 20)[0]
-    test_episodes_shape = (100, 20)
-
+    test_episodes_shape = (1000, 20)
+    test_episodes = generate_episodes(env, *test_episodes_shape)[0]
 
     loss_history = []
     progress = []
     p_iteration_fmt = 'Iteration, {}, {}, {:.1f}, {:.3f}\n'
     p_epoch_fmt = 'Epoch {}, {}, {:.1f}, {:.3f}\n\n'
 
-
     # Begin training.
     decays = np.hstack([np.ones(20, dtype=np.float32),
-                        np.linspace(1.0, 0.1, 64)])
+                        np.linspace(1.0, 0.2, 64)])
     for e in range(num_epochs):
-        decay = decays[e] if e < len(decays) else 0.1
+        decay = decays[e] if e < len(decays) else 0.2
         tic = time.time()
         opt_state = opt_init(params)
 
         # Generate data from random-play using the environment.
-        rng, sub_rng = jax.random.split(rng)
-        # k = max(k_min, min(k_max, reverse_fib(e + 1)))  # Slowly increase the length of each episode starting from k_min.
-        k = k_max
-        states, w, children, rewards = generate_episodes(sub_rng, env, episodes, k, decay)
+        states, w, children, rewards = generate_episodes(env, episodes, k_max, decay)
 
         # Train the model on the generated data. Periodically recompute the target values.
         epoch_mean_loss = 0.0
@@ -261,7 +256,6 @@ def train(rng, env, batch_size=128, num_epochs=5, num_iterations=21,
                 total_loss += loss
 
             # Book-keeping.
-
             iter_mean_loss = total_loss / num_samples
             epoch_mean_loss = (it * epoch_mean_loss + iter_mean_loss) / (it + 1)
             loss_history.append(iter_mean_loss)
@@ -288,9 +282,9 @@ def train(rng, env, batch_size=128, num_epochs=5, num_iterations=21,
         Vs = apply_fun(params, test_episodes).reshape(test_episodes_shape)
         Vmeans = np.mean(Vs, axis=0)
         Vsolved = float(apply_fun(params, _solved_state))
-        print('Solved state V: {:.3f}'.format(Vsolved))
+        print('Distance  0 states mean V:: {:.3f}'.format(Vsolved))
         for q, m in enumerate(Vmeans, 1):
-            print('Distance {} states mean V: {:.3f}'.format(q, m))
+            print('Distance {:2} states mean V: {:.3f}'.format(q, m))
         # Do Best First Search evaluation of TEST SET
         bs_solved = [beam_search(env, s, params, apply_fun) for s in test_set]
         bs_rate = sum(bs_solved) / len(bs_solved)
@@ -314,7 +308,6 @@ def train(rng, env, batch_size=128, num_epochs=5, num_iterations=21,
 if __name__ == "__main__":
     # from cube_model_naive import Cube as env
     from rubick import RubickCube as env
-
     rng = jax.random.PRNGKey(seed=17)
 
     ### Run training.
@@ -329,8 +322,8 @@ if __name__ == "__main__":
                                  verbose=True,
                                  params_filepath=None)
 
-    epi = generate_episodes(rng, env, 1, 30)[0]
-    apply_fun(params, epi)
+    # epi = generate_episodes(rng, env, 1, 30)[0]
+    # apply_fun(params, epi)
 
 # from rubick import RubickCube as env
 # rng = jax.random.PRNGKey(seed=17)
