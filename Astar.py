@@ -7,12 +7,8 @@ from collections import abc, deque, defaultdict
 from functools import partial, total_ordering
 from time import time
 
-# from src.cube_model_naive import Cube, expand_state, plot_state
 from src.rubick import RubickCube, expand_states, expand_state
-# from src.cnn import cnn_init, cnn_apply
 from src.fcnn import value_appoximator
-
-np.random.seed(1)
 
 
 class Frontier:
@@ -269,7 +265,7 @@ def _reconstruct_path(node, parents):
     return tuple(path[::-1])
 
 
-def _test(params, N=100, scrambles=5):
+def _test(params, N=100, scrambles=5, max_iterations=1000):
 
     _, apply = value_appoximator()
     h = heuristic_from_nn(apply, params)
@@ -277,7 +273,7 @@ def _test(params, N=100, scrambles=5):
     for _ in range(N):
         start = RubickCube()
         start.shuffle(scrambles)
-        solution = search(start, h, 500)
+        solution = search(start, h, max_iterations)
         if solution:
             for a in solution:
                 start.step(a)
@@ -288,8 +284,8 @@ def _test(params, N=100, scrambles=5):
 
 
 if __name__ == '__main__':
-    # params = jnp.load('src/params103.npy', allow_pickle=True)
-    # _test(params, 100, scrambles=20)
+    params = jnp.load('src/params103.npy', allow_pickle=True)
+    _test(params, 100, scrambles=15)
     pass
 
 
