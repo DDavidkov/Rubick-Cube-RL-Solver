@@ -7,40 +7,12 @@ from collections import abc, deque, defaultdict
 from functools import partial, total_ordering
 from time import time
 
-np.random.seed(1)
-
 # from src.cube_model_naive import Cube, expand_state, plot_state
 from src.rubick import RubickCube, expand_states, expand_state
 # from src.cnn import cnn_init, cnn_apply
 from src.fcnn import value_appoximator
 
-
-def astar(state, params, approximator):
-    # (value, steps, stateID, actions)
-    v = approximator(params, np.array([state]))
-    uid = 0
-    node_states = {uid: state}
-    node_values = {uid: float(v)}
-    H = [(-float(v), 0, uid, tuple())]
-    heapq.heapify(H)
-
-    _cube = RubickCube()
-    i = 0
-    while i < 1000:
-        _, steps, current_id, actions = heapq.heappop(H)
-        current = node_states[current_id]
-        children, rewards = expand_state(current)
-        children_values = approximator(params, jnp.array(children))
-        for cval, cstate, cact in zip(children_values, children, range(12)):
-            uid += 1
-            node_states[uid] = cstate
-            node_values[uid] = (-float(cval) + steps + 1)
-            c_actions = actions + (cact,)
-            if _cube.is_terminal(cstate):
-                return c_actions
-            heapq.heappush(H, (node_values[uid], steps + 1, uid, c_actions))
-        i += 1
-    return ()
+np.random.seed(1)
 
 
 class Frontier:
@@ -315,51 +287,37 @@ def _test(params, N=100, scrambles=5):
     return success / N
 
 
-# def shuffled(moves: int):
-#     """Return shuffled cube"""
-#     cube = Cube()
-#     actions = np.random.randint(0, 12, moves)
-#     for a in actions:
-#         cube.step(a)
-#     return cube._state
-
-# taken = []
-# states = []
-# actions = []
-# for _ in range(10):
-#     cube = Cube()
-#     act = np.random.randint(0, 12, 12)
-#     for a in act:
-#         cube.step(a)
-#     actions.append(act)
-#     states.append(cube._state)
-#     taken.append(astar(cube._state, p, cnn_apply))
+if __name__ == '__main__':
+    # params = jnp.load('src/params103.npy', allow_pickle=True)
+    # _test(params, 100, scrambles=20)
+    pass
 
 
-# def plot_path(start_state, actions):
-#     cube = Cube()
-#     cube._state = start_state
-#     for a in actions:
-#         cube.step(a)
-#     plot_state(cube._state)
+# ===---------------------------- LEGACY CODE ----------------------------=== #
 
+# def astar(state, params, approximator):
+#     # (value, steps, stateID, actions)
+#     v = approximator(params, np.array([state]))
+#     uid = 0
+#     node_states = {uid: state}
+#     node_values = {uid: float(v)}
+#     H = [(-float(v), 0, uid, tuple())]
+#     heapq.heapify(H)
 
-# start = time()
-# res = astar(cube._state, p, cnn_apply)
-# end = time()
-# res, end - start
-
-# def test_old(N=100, scrambles=5):
-#     p = jax.numpy.load('src/params103.npy', allow_pickle=True)
-#     _, apply = value_appoximator()
-#     for _ in range(N):
-#         r = RubickCube()
-#         r.shuffle(scrambles)
-#         if astar(r.state, p, apply):
-#             print(1)
-#         else:
-#             print(0)
-
-params = jnp.load('src/params103.npy', allow_pickle=True)
-_test(params, 100, scrambles=10)
-# test_old()
+#     _cube = RubickCube()
+#     i = 0
+#     while i < 1000:
+#         _, steps, current_id, actions = heapq.heappop(H)
+#         current = node_states[current_id]
+#         children, rewards = expand_state(current)
+#         children_values = approximator(params, jnp.array(children))
+#         for cval, cstate, cact in zip(children_values, children, range(12)):
+#             uid += 1
+#             node_states[uid] = cstate
+#             node_values[uid] = (-float(cval) + steps + 1)
+#             c_actions = actions + (cact,)
+#             if _cube.is_terminal(cstate):
+#                 return c_actions
+#             heapq.heappush(H, (node_values[uid], steps + 1, uid, c_actions))
+#         i += 1
+#     return ()
