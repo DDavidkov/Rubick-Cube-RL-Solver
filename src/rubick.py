@@ -764,7 +764,7 @@ class RubickCube:
         RubickCube._actions[a](self.state)
         done = self.is_solved()
         reward = 1 if done else -1
-        return self.state, reward, done
+        return self.state.copy(), reward, done
 
     def move(self, a):
         """
@@ -787,20 +787,25 @@ class RubickCube:
         """ Returns true if `self.state` is the terminal state """
         return np.all(self.state == RubickCube.terminal_state)
 
-
-# def expand_state(state: np.ndarray):
-#     """ Returns all 12 children of `cube` in a tuple """
-#     children = [ACTIONS[a](state) for a in range(12)]
-#     solved = solved_cube()
-#     rewards = [1 if np.all(s == solved) else -1 for s in children]
-#     return children, rewards
+    def shuffle(self, n):
+        """Make `n` random moves to `self`. """
+        for m in np.random.randint(0, 12, n):
+            self.step(m)
 
 
-# def expand_states(states):
-#     """ states : List of Numpy ndarrays """
-#     children, rewards = list(zip(*map(expand_state, states)))
-#     children = np.vstack(children)
-#     rewards = np.vstack(rewards).reshape(-1, 1)
-#     children = np.expand_dims(children, 3).astype(np.float)
-#     return children, rewards
+def expand_state(state: np.ndarray):
+    """ Returns all 12 children of `cube` in a tuple """
+    children = [ACTIONS[a](state) for a in range(12)]
+    solved = solved_cube()
+    rewards = [1 if np.all(s == solved) else -1 for s in children]
+    return children, rewards
+
+
+def expand_states(states):
+    """ states : List of Numpy ndarrays """
+    children, rewards = list(zip(*map(expand_state, states)))
+    children = np.vstack(children)
+    rewards = np.vstack(rewards).reshape(-1, 1)
+    children = np.expand_dims(children, 3).astype(np.float)
+    return children, rewards
 
