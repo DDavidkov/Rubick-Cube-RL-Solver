@@ -3,9 +3,7 @@ import numpy as np
 import heapq
 import jax
 import jax.numpy as jnp
-from collections import abc, deque, defaultdict
-from functools import partial, total_ordering
-from time import time
+from collections import defaultdict
 
 from src.rubick import RubickCube, expand_states, expand_state
 from src.fcnn import value_appoximator
@@ -221,13 +219,9 @@ def search(start, heuristic, max_iterations=10_000):
     # distance from `start` to current node
     G = defaultdict(lambda: np.inf)
     G[start_node] = 0
-    # frontier = {start_node: start_score}
-    # getter = frontier.__getitem__
     frontier = Frontier({start_node: start_score})
 
     for _ in range(max_iterations):
-        # current_node = max(frontier, key=getter)
-        # frontier.pop(current_node)
         current_node = frontier.pop_best()
         if current_node._cube.is_solved():
             return _reconstruct_path(current_node, parents)
