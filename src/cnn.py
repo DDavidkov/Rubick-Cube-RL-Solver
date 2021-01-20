@@ -1,28 +1,40 @@
 import numpy as np
 import jax
 import jax.numpy as jnp
-from jax.experimental.stax import Conv, Relu, Flatten, Dense, serial
+from jax.experimental.stax import Conv, Relu, Flatten, Dense, Dropout, serial
 from jax.nn.initializers import glorot_normal, normal
 from jax.lax import conv_general_dilated
 from jax.nn import relu
 
 
-def conv_net():
+def conv_net(mode="train"):
     out_dim = 1
     dim_nums = ("NHWC", "HWIO", "NHWC")
+    unit_stride = (1,1)
+    zero_pad = ((0,0), (0,0))
 
     # Primary convolutional layer.
-    conv_channels = 8
+    conv_channels = 32
     conv_init, conv_apply = Conv(out_chan=conv_channels, filter_shape=(3,3),
-                                 strides=(1,3), padding=[(0,0), (0,0)])
+                                 strides=(1,3), padding=zero_pad)
     # Group all possible pairs.
-    pair_channels, filter_shape = 64, (1, 2)
+    pair_channels, filter_shape = 256, (1, 2)
 
+    # Convolutional block with the same number of channels.
+    block_channels = pair_channels
+    conv_block_init, conv_block_apply = serial(Conv(block_channels, (1,3), unit_stride, "SAME"), Relu,  # One block of convolutions.
+                                               Conv(block_channels, (1,3), unit_stride, "SAME"), Relu,          
+                                               Conv(block_channels, (1,3), unit_stride, "SAME"))
     # Forward pass.
-    serial_init, serial_apply = serial(Flatten, Dense(512), Relu, Dense(out_dim))
+    hidden_size = 2048
+    dropout_rate = 0.25
+    serial_init, serial_apply = serial(Conv(block_channels, (1,3), (1, 3), zero_pad), Relu,     # Using convolution with strides
+                                       Flatten, Dense(hidden_size),                             # instead of pooling for downsampling.
+                                    #    Dropout(dropout_rate, mode),
+                                       Relu, Dense(out_dim))
 
     def init_fun(rng, input_shape):
-        rng, conv_rng, serial_rng = jax.random.split(rng, num=3)
+        rng, conv_rng, block_rng, serial_rng = jax.random.split(rng, num=4)
 
         # Primary convolutional layer.
         conv_shape, conv_params = conv_init(conv_rng, (-1,) + input_shape)
@@ -37,13 +49,16 @@ def conv_net():
         pair_shape = conv_shape[:2] + (15,) + (pair_channels,)
         pair_params = (W, b)
 
+        # Convolutional block.
+        conv_block_shape, conv_block_params = conv_block_init(block_rng, pair_shape)
+
         # Forward pass.
-        serial_shape, serial_params = serial_init(serial_rng, pair_shape)
-        params = [conv_params, pair_params, serial_params]
+        serial_shape, serial_params = serial_init(serial_rng, conv_block_shape)
+        params = [conv_params, pair_params, conv_block_params, serial_params]
         return serial_shape, params
 
     def apply_fun(params, inputs):
-        conv_params, pair_params, serial_params = params
+        conv_params, pair_params, conv_block_params, serial_params = params
 
         # Apply the primary convolutional layer.
         conv_out = conv_apply(conv_params, inputs)
@@ -51,32 +66,25 @@ def conv_net():
 
         # Group all possible pairs.
         W, b = pair_params
-        stride, pad = (1,1), ((0,0),(0,0))
-        pair_1 = conv_general_dilated(conv_out, W, stride, pad, (1,1), (1,1), dim_nums) + b
-        pair_2 = conv_general_dilated(conv_out, W, stride, pad, (1,1), (1,2), dim_nums) + b
-        pair_3 = conv_general_dilated(conv_out, W, stride, pad, (1,1), (1,3), dim_nums) + b
-        pair_4 = conv_general_dilated(conv_out, W, stride, pad, (1,1), (1,4), dim_nums) + b
-        pair_5 = conv_general_dilated(conv_out, W, stride, pad, (1,1), (1,5), dim_nums) + b
+        pair_1 = conv_general_dilated(conv_out, W, unit_stride, zero_pad, (1,1), (1,1), dim_nums) + b
+        pair_2 = conv_general_dilated(conv_out, W, unit_stride, zero_pad, (1,1), (1,2), dim_nums) + b
+        pair_3 = conv_general_dilated(conv_out, W, unit_stride, zero_pad, (1,1), (1,3), dim_nums) + b
+        pair_4 = conv_general_dilated(conv_out, W, unit_stride, zero_pad, (1,1), (1,4), dim_nums) + b
+        pair_5 = conv_general_dilated(conv_out, W, unit_stride, zero_pad, (1,1), (1,5), dim_nums) + b
         pair_out = jnp.dstack([pair_1, pair_2, pair_3, pair_4, pair_5])
         pair_out = relu(pair_out)
 
+        # Convolutional block.
+        conv_block_out = conv_block_apply(conv_block_params, pair_out)
+
+        # Residual connection.
+        res_out = conv_block_out + pair_out
+        res_out = relu(res_out)
+
         # Forward pass.
-        out = serial_apply(serial_params, pair_out)
+        out = serial_apply(serial_params, res_out)
         return out
 
     return init_fun, apply_fun
 
 #
-
-# if __name__ == "__main__":
-#     rng = jax.random.PRNGKey(0)
-#     input_shape = (3, 18, 1)
-#     init_fun, apply_fun = conv_net()
-#     out_shape, params = init_fun(rng, input_shape)
-#     # print("PARAMS:")
-#     # print(params, "\n\n")
-
-#     inputs = np.array([[i ** 1.0] for i in range(3*18)], dtype=np.float32).reshape(1, 3, 18, 1)
-
-#     # print("inputs:\n", inputs)
-#     vals = apply_fun(params, inputs)
